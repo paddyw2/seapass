@@ -32,8 +32,10 @@ char * openFile()
 
 char * findPassword(char * contents, int index)
 {
+    // set default result for errors
     char * password = malloc(sizeof(char)*120);
     password[0] = '!';
+    // check if index error signal was provided
     if(index == -1) {
         printf("Site does not exist\n");
         return password;
