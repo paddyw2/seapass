@@ -1,44 +1,64 @@
 /* SEAPASS - Basic password manager
- * 2017 - Patrick Withams
- */
+ * 2017 - Patrick Withams */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "includes.h"
+#include "encryption.h"
 
-char * openFile()
+unsigned char * openFile(char filename[])
 {
     // create and open file
     FILE *fptr;
-    fptr = fopen("datafile", "r");
+    fptr = fopen(filename, "r");
     // seek to end and calculate size
     fseek(fptr, 0, SEEK_END);
     int sz = ftell(fptr);
     // use size to allocate memory to
     // file buffer
-    int newsize = (sizeof(char)*sz)+1;
-    char * fileBuffer = malloc(newsize);
+    unsigned char * fileBuffer = malloc(sz);
     // seek back to start and read contents
     // into buffer
     fseek(fptr, 0, SEEK_SET);
-    fread(fileBuffer, 1, sz, fptr);
+    fread(fileBuffer, sizeof(char), sz, fptr);
     // set last value to null
     // and close file
     fileBuffer[sz+1] = 0;
     fclose(fptr);
     // return pointer to allocated
     // memory space
+    printf("opening file\n");
+    //BIO_dump_fp (stdout, (const char *)fileBuffer, sz);
     return fileBuffer;
 }
 
-char * findPassword(char * contents, int index)
+int writeFile(unsigned char * fileContents, int len)
+{
+    printf("Made it!\n");
+    // create and open file
+    FILE *fptr;
+    fptr = fopen("cryptofile", "w");
+    // seek to end and calculate size
+    // use size to allocate memory to
+    // file buffer
+    // seek back to start and read contents
+    // into buffer
+    fwrite(fileContents, 1, len, fptr);
+    // set last value to null
+    // and close file
+    fclose(fptr);
+    // return pointer to allocated
+    // memory space
+    return 0;
+}
+
+
+int findPassword(char * password, char * contents, int index)
 {
     // set default result for errors
-    char * password = malloc(sizeof(char)*120);
     password[0] = '!';
     // check if index error signal was provided
     if(index == -1) {
         printf("Site does not exist\n");
-        return password;
+        return 0;
     }
 
     // first, move to newline to get start of password
@@ -56,7 +76,7 @@ char * findPassword(char * contents, int index)
         counter++;
         pwordindex++;
     }
-    return password;
+    return 0;
 }
 
 int searchFileContents(char * query, char * contents)
@@ -103,32 +123,95 @@ char * stripNewLine(char * input)
     }
     return input;
 }
-int searchPassword(char * query)
+int searchPassword(char * query, unsigned char * content)
 {
-    char * fileContents = openFile();
+    char * fileContents = (char *) content;
     int index = searchFileContents(query, fileContents);
-    char * password = findPassword(fileContents, index);
-    printf("Password: %s\n", password);
+    char * password = malloc(256);
+    findPassword(password, fileContents, index);
+    if(password[0] != '!')
+        printf("Password: %s\n", password);
     free(password);
-    free(fileContents);
     return 0;
 }
 
-int processInput(char * input)
+int processInput(char * input, unsigned char * content)
 {
     input = stripNewLine(input);
     if(input[0] == 'q' && input[1] == 0) {
-        printf("Quitting...\n");
+        printf("Quitting\n");
         return 0;
     } else {
-        searchPassword(input);
+        searchPassword(input, content);
     }
     return 1;
+}
+
+unsigned char * decrypt_password_file(unsigned char *key, unsigned char *iv)
+{
+    unsigned char * ciphertext = malloc(10);
+    ciphertext = openFile("cryptofile");
+    printf("decrypting...\n");
+    int ciphertext_len = strlen((char *) ciphertext);
+    int decryptedtext_len;
+    unsigned char * decryptedtext = malloc(ciphertext_len);
+    //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+    decryptedtext_len = decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext);
+
+    /* Add a NULL terminator. We are expecting printable text */
+    decryptedtext[decryptedtext_len] = '\0';
+
+    //BIO_dump_fp (stdout, (const char *)decryptedtext, decryptedtext_len);
+    return decryptedtext;
+}
+
+int encrypt_password_file(unsigned char *key, unsigned char *iv)
+{
+
+  /* Message to be encrypted */
+    unsigned char * plaintext = malloc(10);
+    plaintext = openFile("datafile");
+    int size = strlen((char *) plaintext);
+
+
+  /* Buffer for ciphertext. Ensure the buffer is long enough for the
+   * ciphertext which may be longer than the plaintext, dependant on the
+   * algorithm and mode
+   */
+  // make cipher text buffer 5x plaintext to avoid seg fault
+  int ptsize = 5*size;
+  unsigned char ciphertext[ptsize];
+
+  int ciphertext_len;
+
+  /* Initialise the library */
+  ERR_load_crypto_strings();
+  OpenSSL_add_all_algorithms();
+  OPENSSL_config(NULL);
+
+  /* Encrypt the plaintext */
+  ciphertext_len = encrypt (plaintext, size, key, iv,
+                            ciphertext);
+
+  printf("encrypting...\n");
+  //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+  writeFile(ciphertext, ciphertext_len);
+
+  return 0;
 }
 
 
 int main()
 {
+    /* A 256 bit key */
+    unsigned char *key = (unsigned char *)"11234567890123456789012345678901";
+
+    /* A 128 bit IV */
+    unsigned char *iv = (unsigned char *)"0123456789012345";
+  
+    unsigned char * filecontents = malloc(10);
+    filecontents = decrypt_password_file(key, iv);
+
     printf("-- Welcome to SeaPass --\n");
     printf("Enter 'q' to quit\n");
     int runProgram = 1;
@@ -140,7 +223,10 @@ int main()
         fgets(userInput, 50, stdin);
         // strip newline character
         char * input = userInput; 
-        runProgram = processInput(input);
+        runProgram = processInput(input, filecontents);
     }
+    // zero password data
+    memset(filecontents, 0, strlen((char *)filecontents));
+    //encrypt_password_file(key, iv); 
     return 0;
 }
