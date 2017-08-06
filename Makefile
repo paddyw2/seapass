@@ -1,2 +1,2 @@
 make:
-	gcc -o main -I/usr/local/opt/openssl/include main.c -lcrypto
+	gcc -g -o main -I/usr/local/opt/openssl/include main.c -lcrypto
