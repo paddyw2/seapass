@@ -1,7 +1,7 @@
 # SeaPass
 ### Basic command line password manager
 
-Requires OpenSSL library installed: [Download from GitHub](https://github.com/openssl/openssl/) 
+Requires OpenSSL library to be installed: [Download from GitHub](https://github.com/openssl/openssl/) 
 
 To compile and run:
 
