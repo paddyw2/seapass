@@ -1,7 +1,8 @@
 /* SEAPASS - Basic password manager
  * 2017 - Patrick Withams */
 
-#include "includes.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "encryption.h"
 
 unsigned char * openFile(char filename[])
