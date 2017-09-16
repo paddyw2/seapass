@@ -166,6 +166,8 @@ unsigned char * decrypt_password_file(unsigned char *key, unsigned char *iv)
     return decryptedtext;
 }
 
+// Not currently used as decrypted file is
+// stored in memory and not saved to disk
 int encrypt_password_file(unsigned char *key, unsigned char *iv)
 {
 
@@ -206,7 +208,6 @@ int main()
 {
     /* A 256 bit key */
     unsigned char *key = (unsigned char *)"11234567890123456789012345678901";
-
     /* A 128 bit IV */
     unsigned char *iv = (unsigned char *)"0123456789012345";
   
