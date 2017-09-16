@@ -1,7 +1,7 @@
 # SeaPass
 ### Basic command line password manager
 
-Work in progress.
+Work in progress
 
 Requires OpenSSL library to be installed: [GitHub repo](https://github.com/openssl/openssl/) 
 
