@@ -3,7 +3,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <openssl/rand.h>
 #include "encryption.h"
+
+#define KEYLENGTH 256
+#define BLOCKSIZE 16
 
 unsigned char * openFile(char filename[])
 {
@@ -31,12 +35,12 @@ unsigned char * openFile(char filename[])
     return fileBuffer;
 }
 
-int writeFile(unsigned char * fileContents, int len)
+int writeFile(unsigned char * fileContents, int len, char * filename)
 {
     printf("Made it!\n");
     // create and open file
     FILE *fptr;
-    fptr = fopen("cryptofile", "w");
+    fptr = fopen(filename, "w");
     // seek to end and calculate size
     // use size to allocate memory to
     // file buffer
@@ -148,8 +152,9 @@ int processInput(char * input, unsigned char * content)
     return 1;
 }
 
-unsigned char * decrypt_password_file(unsigned char *key, unsigned char *iv)
+unsigned char * decrypt_password_file(unsigned char *key)
 {
+    unsigned char * iv = openFile(".iv");
     unsigned char * ciphertext = malloc(10);
     ciphertext = openFile("cryptofile");
     printf("decrypting...\n");
@@ -168,12 +173,15 @@ unsigned char * decrypt_password_file(unsigned char *key, unsigned char *iv)
 
 // Not currently used as decrypted file is
 // stored in memory and not saved to disk
-int encrypt_password_file(unsigned char *key, unsigned char *iv)
+int encrypt_password_file(unsigned char *key, unsigned char * plaintext)
 {
-
+    // generate IV
+    unsigned char *iv = malloc(BLOCKSIZE);
+    if (!RAND_bytes(iv, BLOCKSIZE)) {
+        printf("IV generation error");
+        exit(EXIT_FAILURE);
+    }
   /* Message to be encrypted */
-    unsigned char * plaintext = malloc(10);
-    plaintext = openFile("datafile");
     int size = strlen((char *) plaintext);
 
 
@@ -198,21 +206,41 @@ int encrypt_password_file(unsigned char *key, unsigned char *iv)
 
   printf("encrypting...\n");
   //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-  writeFile(ciphertext, ciphertext_len);
+  writeFile(ciphertext, ciphertext_len, "cryptofile");
+  writeFile(iv, BLOCKSIZE, ".iv");
 
   return 0;
 }
 
+unsigned char * auth()
+{
+    // prompt user for password
+    char next_val;
+    unsigned char * password = malloc(KEYLENGTH);
+    int counter = 0;
+    while(counter < KEYLENGTH) {
+        next_val = getchar();
+        // detect password entered
+        if(next_val == '\n')
+            break;
+        // continue adding to password
+        password[counter] = next_val;
+        counter++;
+    }
+    // null terminate string
+    password[counter] = 0;
+
+    return password;
+}
 
 int main()
 {
+    printf("Enter password: ");
     /* A 256 bit key */
-    unsigned char *key = (unsigned char *)"11234567890123456789012345678901";
-    /* A 128 bit IV */
-    unsigned char *iv = (unsigned char *)"0123456789012345";
+    unsigned char *key = auth();
   
     unsigned char * filecontents = malloc(10);
-    filecontents = decrypt_password_file(key, iv);
+    filecontents = decrypt_password_file(key);
 
     printf("-- Welcome to SeaPass --\n");
     printf("Enter 'q' to quit\n");
@@ -228,7 +256,7 @@ int main()
         runProgram = processInput(input, filecontents);
     }
     // zero password data
-    memset(filecontents, 0, strlen((char *)filecontents));
-    //encrypt_password_file(key, iv); 
+    //memset(filecontents, 0, strlen((char *)filecontents));
+    encrypt_password_file(key, filecontents); 
     return 0;
 }
