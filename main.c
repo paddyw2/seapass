@@ -6,11 +6,17 @@
 #include <openssl/rand.h>
 #include "encryption.h"
 
+#define ENCRYPTEDFILE "cryptofile"
+#define SOURCEFILE "datafile.txt"
 #define PASSWORDSIZE 256
 #define BLOCKSIZE 16
 #define DIGESTSIZE 32
 
-unsigned char * openFile(char filename[])
+/*
+ * opens a file in the current directoy by name
+ * and returns its contents as an unsigned char *
+ */
+unsigned char * open_file(char filename[])
 {
     // create and open file
     FILE *fptr;
@@ -39,7 +45,12 @@ unsigned char * openFile(char filename[])
     return fileBuffer;
 }
 
-int getFileSize(char filename[])
+/*
+ * opens a file and reads its size
+ * if the file does not exist, it returns -1
+ * otherwise it returns the size
+ */
+int get_file_size(char filename[])
 {
     // create and open file
     FILE *fptr;
@@ -55,7 +66,13 @@ int getFileSize(char filename[])
     return sz;
 }
 
-int writeFile(unsigned char * fileContents, int len, char * filename)
+/*
+ * writes the values in fileContents to a file in the
+ * current directory specified by the filename
+ * if the file does not exist, it will create one
+ * if it does exist, it will overwrite it
+ */
+int write_file(unsigned char * fileContents, int len, char * filename)
 {
     // create and open file
     FILE *fptr;
@@ -74,8 +91,11 @@ int writeFile(unsigned char * fileContents, int len, char * filename)
     return 0;
 }
 
-
-int findPassword(char * password, char * contents, int index)
+/*
+ * Given an index signifying the location of a site, the
+ * password is extracted and copied into char * password
+ */
+int find_password(char * password, char * contents, int index)
 {
     // set default result for errors
     password[0] = '!';
@@ -103,7 +123,13 @@ int findPassword(char * password, char * contents, int index)
     return 0;
 }
 
-int searchFileContents(char * query, char * contents)
+/*
+ * Given a partial or whole site query, this returns
+ * the index of the searched site
+ * i.e. if 'ace' is searched, it returns the index
+ * for 'facebook', presuming it exists
+ */
+int search_file_contents(char * query, char * contents)
 {
     char * password;
     char current = 1;
@@ -134,7 +160,12 @@ int searchFileContents(char * query, char * contents)
     return -1;
 }
 
-char * stripNewLine(char * input)
+/*
+ * Given a string input, the new line
+ * character is stripped and changed to
+ * a NULL character
+ */
+char * strip_new_line(char * input)
 {
     int counter = 0;
     while(input[counter] != 0)
@@ -147,129 +178,142 @@ char * stripNewLine(char * input)
     }
     return input;
 }
-int searchPassword(char * query, unsigned char * content)
+
+/*
+ * Manages the sub functions that are required for
+ * finding a password given a partial site query
+ * Once password is extracted, or the error message,
+ * this string is printed
+ */
+int search_password(char * query, unsigned char * content)
 {
+    int password_length = 256;
     char * fileContents = (char *) content;
-    int index = searchFileContents(query, fileContents);
-    char * password = malloc(256);
-    findPassword(password, fileContents, index);
+    int index = search_file_contents(query, fileContents);
+    char * password = malloc(password_length);
+    find_password(password, fileContents, index);
     if(password[0] != '!')
         printf("Password: %s\n", password);
-    free(password);
+    bzero(password, password_length);
     return 0;
 }
 
-int processInput(char * input, unsigned char * content)
+/*
+ * Given a user input string, this function decides
+ * whether to search for a site or quit the program
+ */
+int process_input(char * input, unsigned char * content)
 {
-    input = stripNewLine(input);
+    input = strip_new_line(input);
     if(input[0] == 'q' && input[1] == 0) {
         printf("Quitting\n");
         return 0;
     } else {
-        searchPassword(input, content);
+        search_password(input, content);
     }
     return 1;
 }
-unsigned char * decrypt_password_file_old(unsigned char *key)
-{
-    unsigned char * iv = openFile(".iv");
-    
-    unsigned char * ciphertext = malloc(1);
-    ciphertext = openFile("cryptofile");
-    printf("Decrypting...\n");
-    int ciphertext_len = strlen((char *) ciphertext);
-    int decryptedtext_len;
-    unsigned char * decryptedtext = malloc(ciphertext_len);
-    //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-    decryptedtext_len = decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext);
 
-    /* Add a NULL terminator. We are expecting printable text */
-    decryptedtext[decryptedtext_len] = '\0';
-
-    //BIO_dump_fp (stdout, (const char *)decryptedtext, decryptedtext_len);
-    return decryptedtext;
-}
+/*
+ * Takes a 256bit password digest as a parameter and
+ * decrypts the contents of the encrypted password file
+ * by extracting the IV from the start of the file, and
+ * then passing to the OpenSSL example function found
+ * in encryption.h
+ */
 unsigned char * decrypt_password_file(unsigned char *key)
 {
-    int filesize = getFileSize("cryptofile");
+    // get size of encrypted file and extract to
+    // orig_ciphertext
+    int filesize = get_file_size(ENCRYPTEDFILE);
     unsigned char * orig_ciphertext = malloc(filesize);
-    orig_ciphertext = openFile("cryptofile");
+    orig_ciphertext = open_file(ENCRYPTEDFILE);
 
+    // get size of actual encrypted data by subtracting
+    // IV size
     int ciphertext_len = filesize-BLOCKSIZE;
     unsigned char * ciphertext = malloc(ciphertext_len);
 
-    memcpy(ciphertext,orig_ciphertext+BLOCKSIZE, ciphertext_len);
+    // copy the actual encrypted data to ciphertext
+    memcpy(ciphertext, orig_ciphertext+BLOCKSIZE, ciphertext_len);
 
+    // create IV variable and extract first 128bits of file
+    // into variable
     unsigned char * iv = malloc(BLOCKSIZE);
     memcpy(iv, (const char *)orig_ciphertext, BLOCKSIZE);
 
     printf("Decrypting...\n");
     int decryptedtext_len;
     unsigned char * decryptedtext = malloc(ciphertext_len);
-    //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
+
+    // decrypt using OpenSSL example function
     decryptedtext_len = decrypt(ciphertext, ciphertext_len, key, iv, decryptedtext);
 
-    /* Add a NULL terminator. We are expecting printable text */
+    // Add a NULL terminator. We are expecting printable text
     decryptedtext[decryptedtext_len] = '\0';
 
-    //BIO_dump_fp (stdout, (const char *)decryptedtext, decryptedtext_len);
     return decryptedtext;
 }
 
-// Not currently used as decrypted file is
-// stored in memory and not saved to disk
+/*
+ * Encrypts the provided data (plaintext) using the 256bit
+ * password digest (key)
+ * Generates a random 128bit IV to encrypt with and stores
+ * this in plaintext at the start of the encrypted file
+ */
 int encrypt_password_file(unsigned char *key, unsigned char * plaintext)
 {
-    // generate IV
+    // generate random IV
     unsigned char *iv = malloc(BLOCKSIZE);
     if (!RAND_bytes(iv, BLOCKSIZE)) {
         printf("IV generation error");
         exit(EXIT_FAILURE);
     }
-  /* Message to be encrypted */
     int size = strlen((char *) plaintext);
 
-    //iv = (unsigned char *)"0123456789012345";
-  /* Buffer for ciphertext. Ensure the buffer is long enough for the
-   * ciphertext which may be longer than the plaintext, dependant on the
-   * algorithm and mode
-   */
-  // make cipher text buffer 5x plaintext to avoid seg fault
+  // make cipher text buffer 5x plaintext to allow enough space to
+  // expand the plaintext into ciphertext
   int ptsize = 5*size;
   unsigned char ciphertext[ptsize];
 
   int ciphertext_len;
 
-  /* Initialise the library */
+  // initialize the OpenSSL library
   ERR_load_crypto_strings();
   OpenSSL_add_all_algorithms();
   OPENSSL_config(NULL);
 
-  /* Encrypt the plaintext */
-  ciphertext_len = encrypt (plaintext, size, key, iv,
-                            ciphertext);
+  // encrypt the plaintext using the OpenSSL example function 
+  ciphertext_len = encrypt (plaintext, size, key, iv, ciphertext);
 
   printf("Encrypting...\n");
-  //BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
 
-  /* write IV to start of file */
-  /* HERE LIES A BUG! */
-
+  // create buffer for final file contents
+  // that contains IV + ciphertext
   int cipher_iv_len = ciphertext_len+BLOCKSIZE;
   unsigned char * cipher_iv = malloc(cipher_iv_len);
 
+  // copy IV into first 128bits of file buffer
   memcpy(cipher_iv, iv, BLOCKSIZE);
+  // copy ciphertext into rest of buffer
   memcpy(cipher_iv+BLOCKSIZE, ciphertext, ciphertext_len);
-  /* end of IV write */
-  writeFile(cipher_iv, cipher_iv_len, "cryptofile");
-  //writeFile(iv, BLOCKSIZE, ".iv");
+
+  // write file buffer to file
+  write_file(cipher_iv, cipher_iv_len, ENCRYPTEDFILE);
 
   return 0;
 }
 
-unsigned char * getPassword()
+/*
+ * Prompts the user for a password
+ * Takes input, generates sha256 hash of input
+ * Zeroes the original input
+ * Updates parameter variable with hash result
+ */
+int get_password_digest(unsigned char * password_digest)
 {
     // prompt user for password
+    printf("Enter password: ");
     char next_val;
     unsigned char * password = malloc(PASSWORDSIZE);
     bzero(password, PASSWORDSIZE);
@@ -285,31 +329,48 @@ unsigned char * getPassword()
     }
     // null terminate string
     password[counter] = 0;
-
-    return password;
+    // generate hash of password
+    unsigned char digest[DIGESTSIZE];
+    get_SHA256(password, PASSWORDSIZE, digest);
+    // zero password data
+    bzero(password, PASSWORDSIZE);
+    // update parameter pointer
+    memcpy(password_digest, digest, DIGESTSIZE);
+    return 0;
 }
 
-int checkAccountExists()
+/*
+ * Checks if the encrypted password file exists
+ * If it does not, then most likely a new user
+ * so provide instructions on how to set up a
+ * new password file
+ */
+int check_account_exists()
 {
-
-    int filesize = getFileSize("cryptofile");
+    int filesize = get_file_size(ENCRYPTEDFILE);
+    // if password file does not exist
     if(filesize < 1) {
         printf("No account detected\n");
         printf("Looking for datafile.txt...\n");
-        filesize = getFileSize("datafile.txt");
+        filesize = get_file_size(SOURCEFILE);
+        // if plaintext file needed for password file
+        // setup does not exist
         if(filesize < 1) {
             printf("To create an account, create a datafile.txt\n");
             exit(EXIT_FAILURE);
         } else {
+            // if plaintext file with password info does exist
+            // prompt user for master password and encrypt file
             printf("Encrypting datafile.txt...\n");
-            unsigned char * contents = openFile("datafile.txt");
-            printf("Enter password: ");
-            unsigned char *password = getPassword();
-            unsigned char digest[DIGESTSIZE];
-            writeFile(password, PASSWORDSIZE, "pword");
-            simpleSHA256(password, PASSWORDSIZE, digest);
+            unsigned char * contents = open_file(SOURCEFILE);
+            unsigned char *digest = malloc(DIGESTSIZE);
+            // prompt for password
+            get_password_digest(digest);
+            // encrypt plaintext buffer using password digest
             encrypt_password_file(digest, contents); 
-            writeFile(digest, DIGESTSIZE, "digest");
+            // write encrypted buffer to file
+            write_file(digest, DIGESTSIZE, "digest");
+            // indicate process completion
             printf("Encryption complete\n");
             printf("Restart the program to access your account\n");
             exit(EXIT_SUCCESS);
@@ -318,21 +379,22 @@ int checkAccountExists()
     return 0;
 }
 
+/*
+ * Contains main loop of program
+ */
 int main()
 {
-    
     // check user has a file
-    checkAccountExists();
+    check_account_exists();
 
-    printf("Enter password: ");
-    /* A 256 bit key */
-    unsigned char *password = getPassword();
-    unsigned char digest[DIGESTSIZE];
-    simpleSHA256(password, PASSWORDSIZE, digest);
+    // get user password
+    unsigned char *digest = malloc(DIGESTSIZE);
+    get_password_digest(digest);
 
-    unsigned char * filecontents = malloc(10);
-    filecontents = decrypt_password_file(digest);
+    // get decrypted file contents
+    unsigned char * filecontents = decrypt_password_file(digest);
 
+    // main program loop
     printf("-- Welcome to SeaPass --\n");
     printf("Enter 'q' to quit\n");
     int runProgram = 1;
@@ -344,11 +406,12 @@ int main()
         fgets(userInput, 50, stdin);
         // strip newline character
         char * input = userInput; 
-        runProgram = processInput(input, filecontents);
+        // process user input
+        runProgram = process_input(input, filecontents);
     }
-    // zero password data
-    //memset(filecontents, 0, strlen((char *)filecontents));
+    // encrypt password file with new IV
     encrypt_password_file(digest, filecontents); 
+    // zero plaintext data from memory
+    bzero(filecontents, strlen((const char *)filecontents));
     return 0;
 }
-// old password: 11234567890123456789012345678901

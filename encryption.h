@@ -8,14 +8,41 @@
 #include <openssl/sha.h>
 #include <string.h>
 
-void handleErrors(void)
+/*
+ * General error handler
+ * Gives verbose error
+ */
+void handle_errors(void)
 {
   printf("Error detected!\n");
   ERR_print_errors_fp(stderr);
   abort();
 }
 
-int simpleSHA256(void* input, unsigned long length, unsigned char* md)
+/*
+ * Custom encryption error message
+ */
+void encryption_error(void)
+{
+    printf("Encryption failed\n");
+    exit(EXIT_FAILURE);
+}
+
+/*
+ * Custom error message for incorrect password
+ */
+void decryption_error(void)
+{
+    printf("Decryption failed\n");
+    printf("Please double check your password and try again\n");
+    exit(EXIT_FAILURE);
+}
+
+/*
+ * Slightly modified from StackOverflow user AndiDog:
+ * https://stackoverflow.com/questions/918676/generate-sha-hash-in-c-using-openssl-library
+ */
+int get_SHA256(void* input, unsigned long length, unsigned char* md)
 {
     SHA256_CTX context;
     if(!SHA256_Init(&context))
@@ -30,6 +57,9 @@ int simpleSHA256(void* input, unsigned long length, unsigned char* md)
     return 0;
 }
 
+/*
+ * Encrypts plaintext
+ */
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
   unsigned char *iv, unsigned char *ciphertext)
 {
@@ -39,7 +69,8 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
 
   int ciphertext_len;
 
-  /* Create and initialise the context */ if(!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
+  /* Create and initialise the context */
+  if(!(ctx = EVP_CIPHER_CTX_new())) handle_errors();
 
   /* Initialise the encryption operation. IMPORTANT - ensure you use a key
    * and IV size appropriate for your cipher
@@ -47,18 +78,19 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
    * IV size for *most* modes is the same as the block size. For AES this
    * is 128 bits */
   if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
-    handleErrors();
+    handle_errors();
 
   /* Provide the message to be encrypted, and obtain the encrypted output.
    * EVP_EncryptUpdate can be called multiple times if necessary
    */ if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
-    handleErrors();
+    handle_errors();
   ciphertext_len = len;
 
   /* Finalise the encryption. Further ciphertext bytes may be written at
    * this stage.
+   * If error at this stage, throw custom error message
    */
-  if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) handleErrors();
+  if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) encryption_error();
   ciphertext_len += len;
 
   /* Clean up */
@@ -67,6 +99,9 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
   return ciphertext_len;
 }
 
+/*
+ * Decrypts plaintext
+ */
 int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
   unsigned char *iv, unsigned char *plaintext)
 {
@@ -77,7 +112,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
   int plaintext_len;
 
   /* Create and initialise the context */
-  if(!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
+  if(!(ctx = EVP_CIPHER_CTX_new())) handle_errors();
 
   /* Initialise the decryption operation. IMPORTANT - ensure you use a key
    * and IV size appropriate for your cipher
@@ -85,19 +120,21 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
    * IV size for *most* modes is the same as the block size. For AES this
    * is 128 bits */
   if(1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv))
-    handleErrors();
+    decryption_error();
 
   /* Provide the message to be decrypted, and obtain the plaintext output.
    * EVP_DecryptUpdate can be called multiple times if necessary
    */
   if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
-    handleErrors();
+    handle_errors();
   plaintext_len = len;
 
   /* Finalise the decryption. Further plaintext bytes may be written at
    * this stage.
+   * Any errors caught here signify an incorrect password, so throw
+   * custom error
    */
-  if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) handleErrors();
+  if(1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len)) decryption_error();
   plaintext_len += len;
 
   /* Clean up */
