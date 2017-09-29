@@ -5,12 +5,29 @@
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/sha.h>
 #include <string.h>
 
 void handleErrors(void)
 {
+  printf("Error detected!\n");
   ERR_print_errors_fp(stderr);
   abort();
+}
+
+int simpleSHA256(void* input, unsigned long length, unsigned char* md)
+{
+    SHA256_CTX context;
+    if(!SHA256_Init(&context))
+        return 1;
+
+    if(!SHA256_Update(&context, (unsigned char*)input, length))
+        return 1;
+
+    if(!SHA256_Final(md, &context))
+        return 1;
+
+    return 0;
 }
 
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
@@ -87,69 +104,4 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
   EVP_CIPHER_CTX_free(ctx);
 
   return plaintext_len;
-}
-
-
-int example_main()
-{
-  /* Set up the key and iv. Do I need to say to not hard code these in a
-   * real application? :-)
-   */
-
-  /* A 256 bit key */
-  unsigned char *key = (unsigned char *)"11234567890123456789012345678901";
-
-  /* A 128 bit IV */
-  unsigned char *iv = (unsigned char *)"0123456789012345";
-
-  /* Message to be encrypted */
-  unsigned char *plaintext =
-                (unsigned char *)"The quick brown fox jumps over the lazy dog";
-
-  /* Buffer for ciphertext. Ensure the buffer is long enough for the
-   * ciphertext which may be longer than the plaintext, dependant on the
-   * algorithm and mode
-   */
-  // make cipher text buffer 5x plaintext to avoid seg fault
-  int ptsize = 5*sizeof(plaintext);
-  unsigned char ciphertext[ptsize];
-
-  /* Buffer for the decrypted text */
-  unsigned char decryptedtext[128];
-
-  int decryptedtext_len, ciphertext_len;
-
-  /* Initialise the library */
-  ERR_load_crypto_strings();
-  OpenSSL_add_all_algorithms();
-  OPENSSL_config(NULL);
-
-  /* Encrypt the plaintext */
-  ciphertext_len = encrypt (plaintext, strlen ((char *)plaintext), key, iv,
-                            ciphertext);
-
-  /* Do something useful with the ciphertext here */
-  printf("Ciphertext is:\n");
-
-//  printf("Ciphertext is:\n");
-//  printf("Ciphertext is:\n");
-//  printf("Ciphertext is:\n");
-  BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
-
-  /* Decrypt the ciphertext */
-  decryptedtext_len = decrypt(ciphertext, ciphertext_len, key, iv,
-    decryptedtext);
-
-  /* Add a NULL terminator. We are expecting printable text */
-  decryptedtext[decryptedtext_len] = '\0';
-
-  /* Show the decrypted text */
-  printf("Decrypted text is:\n");
-  printf("%s\n", decryptedtext);
-  //printf("Testerr!\n");
-  /* Clean up */
-  EVP_cleanup();
-  ERR_free_strings();
-
-  return 0;
 }
