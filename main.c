@@ -1,5 +1,7 @@
-/* SEAPASS - Basic password manager
- * 2017 - Patrick Withams */
+/*
+ * SEAPASS - Basic password manager
+ * 2017 - Patrick Withams 
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
