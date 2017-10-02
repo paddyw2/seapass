@@ -14,6 +14,38 @@
 #define BLOCKSIZE 16
 #define DIGESTSIZE 32
 
+int create_new_password_file()
+{
+    printf("Are you sure you want to delete "
+            "your current password file? (Y/n) ");
+    // get first input character
+    char answer = getchar();
+    if(answer == '\n')
+        goto input_finished;
+
+    // see if next character is new line
+    char dump = getchar();
+    if(dump == '\n')
+        goto input_finished;
+
+    // if more than two characters, invalid input
+    // so handle extra characters by dumping to
+    // char variable, and set first character to
+    // invalid input
+    answer = 0;
+    while(dump != '\n' && dump != EOF)
+        dump = getchar();
+
+input_finished:
+    // when input gathered, process it
+    if(answer == '\n' || answer == 'y' || answer == 'Y')
+        printf("You answered yes\n");
+    else
+        printf("You answered no\n");
+
+    return 0;
+}
+
 /*
  * opens a file in the current directoy by name
  * and returns its contents as an unsigned char *
@@ -210,6 +242,8 @@ int process_input(char * input, unsigned char * content)
     if(input[0] == 'q' && input[1] == 0) {
         printf("Quitting\n");
         return 0;
+    } else if(input[0] == 'n' && input[1] == 0) {
+        create_new_password_file();
     } else {
         search_password(input, content);
     }
