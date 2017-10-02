@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <openssl/rand.h>
+#include "seapass.h"
 #include "encryption.h"
 
 #define ENCRYPTEDFILE "cryptofile"
@@ -14,6 +15,22 @@
 #define BLOCKSIZE 16
 #define DIGESTSIZE 32
 
+/*
+ * Prints help menu
+ */
+int print_help()
+{
+    printf("QUIT: q\n"
+           "CHANGE PASSWORD FILE: n\n"
+           "HELP: h\n");
+    return 0;
+}
+
+/*
+ * Confirms the user wants to recreate password file
+ * then deletes encrypted file, and jumps to account
+ * setup
+ */
 int create_new_password_file()
 {
     printf("Are you sure you want to delete "
@@ -38,10 +55,16 @@ int create_new_password_file()
 
 input_finished:
     // when input gathered, process it
-    if(answer == '\n' || answer == 'y' || answer == 'Y')
+    if(answer == '\n' || answer == 'y' || answer == 'Y') {
         printf("You answered yes\n");
-    else
+        // delete password file
+        remove(ENCRYPTEDFILE);
+        // recreate file
+        check_account_exists();
+    } else {
         printf("You answered no\n");
+        // do nothing
+    }
 
     return 0;
 }
@@ -244,6 +267,9 @@ int process_input(char * input, unsigned char * content)
         return 0;
     } else if(input[0] == 'n' && input[1] == 0) {
         create_new_password_file();
+    } else if(input[0] == 'h' && input[1] == 0) {
+        print_help();
+
     } else {
         search_password(input, content);
     }
@@ -404,8 +430,6 @@ int check_account_exists()
             get_password_digest(digest);
             // encrypt plaintext buffer using password digest
             encrypt_password_file(digest, contents); 
-            // write encrypted buffer to file
-            write_file(digest, DIGESTSIZE, "digest");
             // indicate process completion
             printf("Encryption complete\n");
             printf("Restart the program to access your account\n");
@@ -432,7 +456,7 @@ int main()
 
     // main program loop
     printf("-- Welcome to SeaPass --\n");
-    printf("Enter 'q' to quit\n");
+    printf("Enter 'h' for help\n");
     int runProgram = 1;
     while(runProgram == 1) {
         char userInput[50];

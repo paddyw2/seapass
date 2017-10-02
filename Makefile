@@ -1,2 +1,2 @@
 make:
-	gcc -o main main.c -lcrypto
+	gcc -o seapass seapass.c -lcrypto
