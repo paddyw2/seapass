@@ -61,7 +61,6 @@ int get_user_input(char * buffer, int buffer_size)
     return overflow_value;
 }
 
-
 /*
  * Prints help menu
  */
