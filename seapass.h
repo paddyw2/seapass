@@ -1,4 +1,15 @@
 /*
+ * Custom get input function
+ * Reads stdin to chosen buffer, and returns
+ * the length of any input overflow
+ * Note: Always returns string with a new line
+ * at the end to be consistent
+ * Errors are detected by a greater than zero
+ * return value
+ */
+int get_user_input(char * buffer, int buffer_size);
+
+/*
  * Prints help menu
  */
 int print_help();

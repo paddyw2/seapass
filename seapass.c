@@ -16,6 +16,53 @@
 #define DIGESTSIZE 32
 
 /*
+ * Custom get input function
+ * Reads stdin to chosen buffer, and returns
+ * the length of any input overflow
+ * Note: Always returns string with a new line
+ * at the end to be consistent
+ * Errors are detected by a greater than zero
+ * return value
+ */
+int get_user_input(char * buffer, int buffer_size)
+{
+    int overflow_value = 0;
+    char current_char = 0;
+    int counter = 0;
+    
+    // read user input into buffer until
+    // either buffer limit is reached, or
+    // a new line or EOF is submitted
+    while(counter < buffer_size)
+    {
+        current_char = getchar();
+        buffer[counter] = current_char;
+        if(current_char == '\n' ||
+           current_char == EOF)
+            break;
+        counter++;
+    }
+
+    // if input was larger than buffer size
+    // dump remaining contents to variable
+    // and record verflow length
+    if(counter >= buffer_size) {
+        // artificially create new line
+        // to keep a standard
+        buffer[buffer_size-1] = '\n';
+        char dump = getchar();
+        overflow_value = 1;
+        while(dump != '\n' && dump != EOF) {
+            dump = getchar();
+            overflow_value++;
+        }
+    }
+    // return overflow length
+    return overflow_value;
+}
+
+
+/*
  * Prints help menu
  */
 int print_help()
@@ -36,26 +83,15 @@ int create_new_password_file()
     printf("Are you sure you want to delete "
             "your current password file? (Y/n) ");
     // get first input character
-    char answer = getchar();
-    if(answer == '\n')
-        goto input_finished;
+    int input_size = 2;
+    char user_input[input_size];
+    int overflow = get_user_input(user_input, input_size);
 
-    // see if next character is new line
-    char dump = getchar();
-    if(dump == '\n')
-        goto input_finished;
-
-    // if more than two characters, invalid input
-    // so handle extra characters by dumping to
-    // char variable, and set first character to
-    // invalid input
-    answer = 0;
-    while(dump != '\n' && dump != EOF)
-        dump = getchar();
-
-input_finished:
     // when input gathered, process it
-    if(answer == '\n' || answer == 'y' || answer == 'Y') {
+    if(overflow > 0) {
+        printf("Invalid input\n");
+    } else if(user_input[0] == '\n' ||
+       user_input[0] == 'y' || user_input[0] == 'Y') {
         printf("You answered yes\n");
         // delete password file
         remove(ENCRYPTEDFILE);
@@ -377,23 +413,15 @@ int get_password_digest(unsigned char * password_digest)
     // prompt user for password
     printf("Enter password: ");
     char next_val;
-    unsigned char * password = malloc(PASSWORDSIZE);
+    char * password = malloc(PASSWORDSIZE);
     bzero(password, PASSWORDSIZE);
-    int counter = 0;
-    while(counter < PASSWORDSIZE) {
-        next_val = getchar();
-        // detect password entered
-        if(next_val == '\n')
-            break;
-        // continue adding to password
-        password[counter] = next_val;
-        counter++;
-    }
-    // null terminate string
-    password[counter] = 0;
+    // get user input password, with new line
+    get_user_input(password, PASSWORDSIZE);
+    // replace new line with NULL
+    strip_new_line(password);
     // generate hash of password
     unsigned char digest[DIGESTSIZE];
-    get_SHA256(password, PASSWORDSIZE, digest);
+    get_SHA256((unsigned char *)password, PASSWORDSIZE, digest);
     // zero password data
     bzero(password, PASSWORDSIZE);
     // update parameter pointer
@@ -458,16 +486,15 @@ int main()
     printf("-- Welcome to SeaPass --\n");
     printf("Enter 'h' for help\n");
     int runProgram = 1;
+    int input_size = 50;
     while(runProgram == 1) {
-        char userInput[50];
+        char user_input[input_size];
         printf("Enter site query\n");
         printf("> ");
         // get user input
-        fgets(userInput, 50, stdin);
-        // strip newline character
-        char * input = userInput; 
+        get_user_input(user_input, input_size);
         // process user input
-        runProgram = process_input(input, filecontents);
+        runProgram = process_input(user_input, filecontents);
     }
     // encrypt password file with new IV
     encrypt_password_file(digest, filecontents); 
